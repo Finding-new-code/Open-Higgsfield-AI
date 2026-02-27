@@ -1,4 +1,3 @@
-import { muapi } from '../lib/muapi.js';
 import { AuthModal } from './AuthModal.js';
 import { getUploadHistory, saveUpload, removeUpload, generateThumbnail } from '../lib/uploadHistory.js';
 
@@ -7,13 +6,30 @@ import { getUploadHistory, saveUpload, removeUpload, generateThumbnail } from '.
  *
  * @param {object} options
  * @param {HTMLElement} options.anchorContainer - The container element the panel is positioned relative to
- * @param {function({ url: string, thumbnail: string }): void} options.onSelect - Called when an image is selected
+ * @param {function({ inlineData: { mimeType: string, data: string }, thumbnail: string }): void} options.onSelect - Called when an image is selected
  * @param {function(): void} [options.onClear] - Called when the active selection is removed from history
  * @returns {{ trigger: HTMLElement, panel: HTMLElement, reset: function }}
  */
 export function createUploadPicker({ anchorContainer, onSelect, onClear }) {
     let panelOpen = false;
-    let selectedEntry = null; // { url, thumbnail }
+    let selectedEntry = null; // { inlineData, thumbnail }
+
+    const fileToInlineData = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.onload = () => {
+            const result = reader.result;
+            if (typeof result !== 'string') return reject(new Error('Invalid file data'));
+            const commaIndex = result.indexOf(',');
+            if (commaIndex === -1) return reject(new Error('Invalid data URL'));
+            const header = result.slice(0, commaIndex);
+            const data = result.slice(commaIndex + 1);
+            const match = header.match(/^data:(.*?);base64$/);
+            const mimeType = match?.[1] || file.type || 'application/octet-stream';
+            resolve({ mimeType, data });
+        };
+        reader.readAsDataURL(file);
+    });
 
     // ── Hidden file input ────────────────────────────────────────────────────
     const fileInput = document.createElement('input');
@@ -132,7 +148,8 @@ export function createUploadPicker({ anchorContainer, onSelect, onClear }) {
         grid.className = 'grid grid-cols-3 gap-2 max-h-56 overflow-y-auto custom-scrollbar pr-0.5';
 
         history.forEach(entry => {
-            const isSelected = selectedEntry?.url === entry.uploadedUrl;
+            const hasInline = !!entry.inlineData?.data;
+            const isSelected = hasInline && selectedEntry?.inlineData?.data === entry.inlineData?.data;
 
             const cell = document.createElement('div');
             cell.className = `relative rounded-xl overflow-hidden border-2 cursor-pointer group/cell aspect-square transition-all ${isSelected ? 'border-primary shadow-glow' : 'border-white/10 hover:border-white/30'}`;
@@ -154,7 +171,7 @@ export function createUploadPicker({ anchorContainer, onSelect, onClear }) {
             delBtn.onclick = (e) => {
                 e.stopPropagation();
                 removeUpload(entry.id);
-                if (selectedEntry?.url === entry.uploadedUrl) {
+                if (selectedEntry?.inlineData?.data === entry.inlineData?.data) {
                     selectedEntry = null;
                     showIcon();
                     onClear?.();
@@ -176,9 +193,13 @@ export function createUploadPicker({ anchorContainer, onSelect, onClear }) {
 
             cell.onclick = (e) => {
                 e.stopPropagation();
-                selectedEntry = { url: entry.uploadedUrl, thumbnail: entry.thumbnail };
+                if (!hasInline) {
+                    alert('This upload is from a previous version and cannot be reused. Please upload the image again.');
+                    return;
+                }
+                selectedEntry = { inlineData: entry.inlineData, thumbnail: entry.thumbnail };
                 showThumbnail(entry.thumbnail);
-                onSelect({ url: entry.uploadedUrl, thumbnail: entry.thumbnail });
+                onSelect({ inlineData: entry.inlineData, thumbnail: entry.thumbnail });
                 closePanel();
             };
 
@@ -203,7 +224,7 @@ export function createUploadPicker({ anchorContainer, onSelect, onClear }) {
         const file = e.target.files[0];
         if (!file) return;
 
-        const apiKey = localStorage.getItem('muapi_key');
+        const apiKey = localStorage.getItem('google_ai_key');
         if (!apiKey) {
             AuthModal(() => fileInput.click());
             return;
@@ -212,24 +233,23 @@ export function createUploadPicker({ anchorContainer, onSelect, onClear }) {
         showSpinner();
 
         try {
-            // Upload to API and generate thumbnail in parallel
-            const [uploadedUrl, thumbnail] = await Promise.all([
-                muapi.uploadFile(file),
+            const [inlineData, thumbnail] = await Promise.all([
+                fileToInlineData(file),
                 generateThumbnail(file)
             ]);
 
             const entry = {
                 id: Date.now().toString(),
                 name: file.name,
-                uploadedUrl,
+                inlineData,
                 thumbnail,
                 timestamp: new Date().toISOString()
             };
 
             saveUpload(entry);
-            selectedEntry = { url: uploadedUrl, thumbnail };
+            selectedEntry = { inlineData, thumbnail };
             showThumbnail(thumbnail);
-            onSelect({ url: uploadedUrl, thumbnail });
+            onSelect({ inlineData, thumbnail });
         } catch (err) {
             console.error('[UploadPicker] Upload failed:', err);
             showIcon();

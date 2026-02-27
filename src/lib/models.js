@@ -2008,6 +2008,36 @@ export const t2iModels = [
   }
 ];
 
+const GOOGLE_T2I_MODEL_IDS = new Set([
+  'nano-banana',
+  'nano-banana-pro'
+]);
+
+const GOOGLE_I2I_MODEL_IDS = new Set([
+  'nano-banana',
+  'nano-banana-pro'
+]);
+
+const GOOGLE_T2V_MODEL_IDS = new Set([
+  'veo3-text-to-video',
+  'veo3-fast-text-to-video',
+  'veo3.1-text-to-video',
+  'veo3.1-fast-text-to-video'
+]);
+
+const GOOGLE_I2V_MODEL_IDS = new Set([
+  'veo3-image-to-video',
+  'veo3-fast-image-to-video',
+  'veo3.1-image-to-video',
+  'veo3.1-fast-image-to-video',
+  'veo3.1-reference-to-video'
+]);
+
+export const googleT2iModels = t2iModels.filter(m => GOOGLE_T2I_MODEL_IDS.has(m.id));
+export const googleI2iModels = t2iModels.filter(m => GOOGLE_I2I_MODEL_IDS.has(m.id));
+export let googleT2vModels = [];
+export let googleI2vModels = [];
+
 export const getModelById = (id) => t2iModels.find(m => m.id === id);
 
 export const getAspectRatiosForModel = (modelId) => {
@@ -7668,46 +7698,49 @@ export const getI2IModelById = (id) => i2iModels.find(m => m.id === id);
 export const getI2VModelById = (id) => i2vModels.find(m => m.id === id);
 
 export const getAspectRatiosForI2IModel = (modelId) => {
-    const model = getI2IModelById(modelId);
-    if (!model) return ['1:1'];
-    if (model.inputs && model.inputs.aspect_ratio && model.inputs.aspect_ratio.enum) return model.inputs.aspect_ratio.enum;
-    return ['1:1', '16:9', '9:16'];
+  const model = getI2IModelById(modelId);
+  if (!model) return ['1:1'];
+  if (model.inputs && model.inputs.aspect_ratio && model.inputs.aspect_ratio.enum) return model.inputs.aspect_ratio.enum;
+  return ['1:1', '16:9', '9:16'];
 };
 
 export const getAspectRatiosForI2VModel = (modelId) => {
-    const model = getI2VModelById(modelId);
-    if (!model) return ['16:9'];
-    if (model.inputs && model.inputs.aspect_ratio && model.inputs.aspect_ratio.enum) return model.inputs.aspect_ratio.enum;
-    return ['16:9', '9:16', '1:1'];
+  const model = getI2VModelById(modelId);
+  if (!model) return ['16:9'];
+  if (model.inputs && model.inputs.aspect_ratio && model.inputs.aspect_ratio.enum) return model.inputs.aspect_ratio.enum;
+  return ['16:9', '9:16', '1:1'];
 };
 
 export const getDurationsForI2VModel = (modelId) => {
-    const model = getI2VModelById(modelId);
-    if (!model) return [];
-    const dur = model.inputs && model.inputs.duration;
-    if (!dur) return [];
-    if (dur.enum) return dur.enum;
-    if (dur.minValue !== undefined && dur.maxValue !== undefined && dur.step) {
-        const vals = [];
-        for (let v = dur.minValue; v <= dur.maxValue; v += dur.step) vals.push(v);
-        return vals;
-    }
-    if (dur.default) return [dur.default];
-    return [];
+  const model = getI2VModelById(modelId);
+  if (!model) return [];
+  const dur = model.inputs && model.inputs.duration;
+  if (!dur) return [];
+  if (dur.enum) return dur.enum;
+  if (dur.minValue !== undefined && dur.maxValue !== undefined && dur.step) {
+    const vals = [];
+    for (let v = dur.minValue; v <= dur.maxValue; v += dur.step) vals.push(v);
+    return vals;
+  }
+  if (dur.default) return [dur.default];
+  return [];
 };
 
 export const getResolutionsForI2VModel = (modelId) => {
-    const model = getI2VModelById(modelId);
-    if (!model) return [];
-    const res = model.inputs && model.inputs.resolution;
-    if (res && res.enum) return res.enum;
-    return [];
+  const model = getI2VModelById(modelId);
+  if (!model) return [];
+  const res = model.inputs && model.inputs.resolution;
+  if (res && res.enum) return res.enum;
+  return [];
 };
 
 export const getResolutionsForI2IModel = (modelId) => {
-    const model = getI2IModelById(modelId);
-    if (!model) return [];
-    const res = model.inputs && model.inputs.resolution;
-    if (res && res.enum) return res.enum;
-    return [];
+  const model = getI2IModelById(modelId);
+  if (!model) return [];
+  const res = model.inputs && model.inputs.resolution;
+  if (res && res.enum) return res.enum;
+  return [];
 };
+
+googleT2vModels = t2vModels.filter(m => GOOGLE_T2V_MODEL_IDS.has(m.id));
+googleI2vModels = i2vModels.filter(m => GOOGLE_I2V_MODEL_IDS.has(m.id));

@@ -1,5 +1,5 @@
 import { muapi } from '../lib/muapi.js';
-import { t2vModels, getAspectRatiosForVideoModel, getDurationsForModel, getResolutionsForVideoModel, i2vModels, getAspectRatiosForI2VModel, getDurationsForI2VModel, getResolutionsForI2VModel } from '../lib/models.js';
+import { googleT2vModels, googleI2vModels, getAspectRatiosForVideoModel, getDurationsForModel, getResolutionsForVideoModel, getAspectRatiosForI2VModel, getDurationsForI2VModel, getResolutionsForI2VModel } from '../lib/models.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
 
@@ -8,17 +8,17 @@ export function VideoStudio() {
     container.className = 'w-full h-full flex flex-col items-center justify-center bg-app-bg relative p-4 md:p-6 overflow-y-auto custom-scrollbar overflow-x-hidden';
 
     // --- State ---
-    const defaultModel = t2vModels[0];
+    const defaultModel = googleT2vModels[0];
     let selectedModel = defaultModel.id;
     let selectedModelName = defaultModel.name;
     let selectedAr = defaultModel.inputs?.aspect_ratio?.default || '16:9';
     let selectedDuration = defaultModel.inputs?.duration?.default || 5;
     let selectedResolution = defaultModel.inputs?.resolution?.default || '';
     let dropdownOpen = null;
-    let uploadedImageUrl = null;
+    let uploadedImageInline = null;
     let imageMode = false; // false = t2v models, true = i2v models
 
-    const getCurrentModels = () => imageMode ? i2vModels : t2vModels;
+    const getCurrentModels = () => imageMode ? googleI2vModels : googleT2vModels;
     const getCurrentAspectRatios = (id) => imageMode ? getAspectRatiosForI2VModel(id) : getAspectRatiosForVideoModel(id);
     const getCurrentDurations = (id) => imageMode ? getDurationsForI2VModel(id) : getDurationsForModel(id);
     const getCurrentResolutions = (id) => imageMode ? getResolutionsForI2VModel(id) : getResolutionsForVideoModel(id);
@@ -47,6 +47,7 @@ export function VideoStudio() {
         </div>
         <h1 class="text-2xl sm:text-4xl md:text-7xl font-black text-white tracking-widest uppercase mb-4 selection:bg-primary selection:text-black text-center px-4">Video Studio</h1>
         <p class="text-secondary text-sm font-medium tracking-wide opacity-60">Animate images into stunning AI videos with motion effects</p>
+        <p class="text-secondary text-[11px] font-bold tracking-wide opacity-60 mt-3">Models: Google AI only (Veo)</p>
     `;
     container.appendChild(hero);
 
@@ -66,22 +67,24 @@ export function VideoStudio() {
     // --- Image Upload Picker (Image-to-Video) ---
     const picker = createUploadPicker({
         anchorContainer: container,
-        onSelect: ({ url }) => {
-            uploadedImageUrl = url;
+        onSelect: ({ inlineData }) => {
+            uploadedImageInline = inlineData;
             if (!imageMode) {
                 imageMode = true;
-                selectedModel = i2vModels[0].id;
-                selectedModelName = i2vModels[0].name;
+                selectedModel = googleI2vModels[0].id;
+                selectedModelName = googleI2vModels[0].name;
+                selectedAr = getAspectRatiosForI2VModel(selectedModel)[0];
                 document.getElementById('v-model-btn-label').textContent = selectedModelName;
                 updateControlsForModel(selectedModel);
             }
             textarea.placeholder = 'Describe the motion or effect (optional)';
         },
         onClear: () => {
-            uploadedImageUrl = null;
+            uploadedImageInline = null;
             imageMode = false;
-            selectedModel = t2vModels[0].id;
-            selectedModelName = t2vModels[0].name;
+            selectedModel = googleT2vModels[0].id;
+            selectedModelName = googleT2vModels[0].name;
+            selectedAr = getAspectRatiosForVideoModel(selectedModel)[0];
             document.getElementById('v-model-btn-label').textContent = selectedModelName;
             updateControlsForModel(selectedModel);
             textarea.placeholder = 'Describe the video you want to create';
@@ -517,11 +520,12 @@ export function VideoStudio() {
         promptWrapper.classList.remove('hidden', 'opacity-40');
         textarea.value = '';
         picker.reset();
-        uploadedImageUrl = null;
+        uploadedImageInline = null;
         // Reset to t2v mode
         imageMode = false;
-        selectedModel = t2vModels[0].id;
-        selectedModelName = t2vModels[0].name;
+        selectedModel = googleT2vModels[0].id;
+        selectedModelName = googleT2vModels[0].name;
+        selectedAr = getAspectRatiosForVideoModel(selectedModel)[0];
         document.getElementById('v-model-btn-label').textContent = selectedModelName;
         updateControlsForModel(selectedModel);
         textarea.placeholder = 'Describe the video you want to create';
@@ -534,7 +538,7 @@ export function VideoStudio() {
     generateBtn.onclick = async () => {
         const prompt = textarea.value.trim();
         if (imageMode) {
-            if (!uploadedImageUrl) {
+            if (!uploadedImageInline) {
                 alert('Please upload a start frame image first.');
                 return;
             }
@@ -545,7 +549,7 @@ export function VideoStudio() {
             }
         }
 
-        const apiKey = localStorage.getItem('muapi_key');
+        const apiKey = localStorage.getItem('google_ai_key');
         if (!apiKey) {
             AuthModal(() => generateBtn.click());
             return;
@@ -562,7 +566,7 @@ export function VideoStudio() {
             };
 
             if (prompt) params.prompt = prompt;
-            if (imageMode && uploadedImageUrl) params.image_url = uploadedImageUrl;
+            if (imageMode && uploadedImageInline) params.image_inline = uploadedImageInline;
 
             const durations = getCurrentDurations(selectedModel);
             if (durations.length > 0) params.duration = selectedDuration;
@@ -594,7 +598,12 @@ export function VideoStudio() {
             }
         } catch (e) {
             console.error(e);
-            generateBtn.innerHTML = `Error: ${e.message.slice(0, 40)}`;
+            const msg = String(e?.message || e);
+            if (msg.toLowerCase().includes('unsupported') && msg.toLowerCase().includes('model')) {
+                generateBtn.innerHTML = `Unsupported model — pick a Google model`;
+            } else {
+                generateBtn.innerHTML = `Error: ${msg.slice(0, 40)}`;
+            }
             setTimeout(() => {
                 generateBtn.innerHTML = `Generate ✨`;
                 generateBtn.disabled = false;

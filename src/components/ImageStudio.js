@@ -1,5 +1,5 @@
 import { muapi } from '../lib/muapi.js';
-import { t2iModels, getAspectRatiosForModel, i2iModels, getAspectRatiosForI2IModel, getResolutionsForI2IModel } from '../lib/models.js';
+import { googleT2iModels, googleI2iModels, getAspectRatiosForModel, getAspectRatiosForI2IModel, getResolutionsForI2IModel } from '../lib/models.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
 
@@ -8,15 +8,15 @@ export function ImageStudio() {
     container.className = 'w-full h-full flex flex-col items-center justify-center bg-app-bg relative p-4 md:p-6 overflow-y-auto custom-scrollbar overflow-x-hidden';
 
     // --- State ---
-    const defaultModel = t2iModels[0];
+    const defaultModel = googleT2iModels[0];
     let selectedModel = defaultModel.id;
     let selectedModelName = defaultModel.name;
     let selectedAr = defaultModel.inputs?.aspect_ratio?.default || '1:1';
     let dropdownOpen = null;
-    let uploadedImageUrl = null;
+    let uploadedImageInline = null;
     let imageMode = false; // false = t2i models, true = i2i models
 
-    const getCurrentModels = () => imageMode ? i2iModels : t2iModels;
+    const getCurrentModels = () => imageMode ? googleI2iModels : googleT2iModels;
     const getCurrentAspectRatios = (id) => imageMode ? getAspectRatiosForI2IModel(id) : getAspectRatiosForModel(id);
     const getCurrentResolutions = (id) => imageMode ? getResolutionsForI2IModel(id) : [];
 
@@ -45,6 +45,7 @@ export function ImageStudio() {
         </div>
         <h1 class="text-2xl sm:text-4xl md:text-7xl font-black text-white tracking-widest uppercase mb-4 selection:bg-primary selection:text-black text-center px-4">Image Studio</h1>
         <p class="text-secondary text-sm font-medium tracking-wide opacity-60">Transform images with AI — upscale, stylize, animate and more</p>
+        <p class="text-secondary text-[11px] font-bold tracking-wide opacity-60 mt-3">Models: Google AI only (Nano Banana)</p>
     `;
     container.appendChild(hero);
 
@@ -65,12 +66,12 @@ export function ImageStudio() {
     // --- Image Upload Picker (Image-to-Image) ---
     const picker = createUploadPicker({
         anchorContainer: container,
-        onSelect: ({ url }) => {
-            uploadedImageUrl = url;
+        onSelect: ({ inlineData }) => {
+            uploadedImageInline = inlineData;
             if (!imageMode) {
                 imageMode = true;
-                selectedModel = i2iModels[0].id;
-                selectedModelName = i2iModels[0].name;
+                selectedModel = googleI2iModels[0].id;
+                selectedModelName = googleI2iModels[0].name;
                 selectedAr = getAspectRatiosForI2IModel(selectedModel)[0];
                 document.getElementById('model-btn-label').textContent = selectedModelName;
                 document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -81,10 +82,10 @@ export function ImageStudio() {
             textarea.placeholder = 'Describe how to transform this image (optional)';
         },
         onClear: () => {
-            uploadedImageUrl = null;
+            uploadedImageInline = null;
             imageMode = false;
-            selectedModel = t2iModels[0].id;
-            selectedModelName = t2iModels[0].name;
+            selectedModel = googleT2iModels[0].id;
+            selectedModelName = googleT2iModels[0].name;
             selectedAr = getAspectRatiosForModel(selectedModel)[0];
             document.getElementById('model-btn-label').textContent = selectedModelName;
             document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -508,11 +509,11 @@ export function ImageStudio() {
         promptWrapper.classList.remove('hidden', 'opacity-40');
         textarea.value = '';
         picker.reset();
-        uploadedImageUrl = null;
+        uploadedImageInline = null;
         // Reset to t2i mode
         imageMode = false;
-        selectedModel = t2iModels[0].id;
-        selectedModelName = t2iModels[0].name;
+        selectedModel = googleT2iModels[0].id;
+        selectedModelName = googleT2iModels[0].name;
         selectedAr = getAspectRatiosForModel(selectedModel)[0];
         document.getElementById('model-btn-label').textContent = selectedModelName;
         document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -527,7 +528,7 @@ export function ImageStudio() {
     generateBtn.onclick = async () => {
         const prompt = textarea.value.trim();
         if (imageMode) {
-            if (!uploadedImageUrl) {
+            if (!uploadedImageInline) {
                 alert('Please upload a reference image first.');
                 return;
             }
@@ -538,7 +539,7 @@ export function ImageStudio() {
             }
         }
 
-        const apiKey = localStorage.getItem('muapi_key');
+        const apiKey = localStorage.getItem('google_ai_key');
         if (!apiKey) {
             AuthModal(() => generateBtn.click());
             return;
@@ -553,7 +554,7 @@ export function ImageStudio() {
             if (imageMode) {
                 const genParams = {
                     model: selectedModel,
-                    image_url: uploadedImageUrl,
+                    image_inline: uploadedImageInline,
                     aspect_ratio: selectedAr
                 };
                 if (prompt) genParams.prompt = prompt;
@@ -588,7 +589,12 @@ export function ImageStudio() {
             }
         } catch (e) {
             console.error(e);
-            generateBtn.innerHTML = `Error: ${e.message.slice(0, 40)}`;
+            const msg = String(e?.message || e);
+            if (msg.toLowerCase().includes('unsupported') && msg.toLowerCase().includes('model')) {
+                generateBtn.innerHTML = `Unsupported model — pick a Google model`;
+            } else {
+                generateBtn.innerHTML = `Error: ${msg.slice(0, 40)}`;
+            }
             setTimeout(() => {
                 generateBtn.innerHTML = `Generate ✨`;
                 generateBtn.disabled = false;

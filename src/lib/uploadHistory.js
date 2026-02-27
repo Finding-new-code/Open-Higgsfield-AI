@@ -3,15 +3,17 @@ const MAX_UPLOADS = 20;
 
 export function getUploadHistory() {
     try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        if (!Array.isArray(raw)) return [];
+        return raw.filter(e => e && (e.inlineData || e.uploadedUrl));
     } catch {
         return [];
     }
 }
 
-export function saveUpload({ id, name, uploadedUrl, thumbnail, timestamp }) {
+export function saveUpload({ id, name, inlineData, thumbnail, timestamp }) {
     const history = getUploadHistory();
-    history.unshift({ id, name, uploadedUrl, thumbnail, timestamp });
+    history.unshift({ id, name, inlineData, thumbnail, timestamp });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, MAX_UPLOADS)));
 }
 

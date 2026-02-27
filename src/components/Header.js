@@ -72,7 +72,7 @@ export function Header(navigate) {
         </svg>
     `;
     keyBtn.onclick = () => {
-        localStorage.removeItem('muapi_key');
+        localStorage.removeItem('google_ai_key');
         window.location.reload();
     };
 
