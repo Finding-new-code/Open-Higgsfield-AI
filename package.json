@@ -22,6 +22,7 @@
     "directories": {
       "output": "release"
     },
+    "afterPack": "./afterPack.js",
     "files": [
       "dist/**/*",
       "electron/**/*"
